@@ -480,7 +480,7 @@ export function translateRequest(
                   ...(hasTargetHint ? { _targetFormat: targetFormat } : {}),
                   ...(preserveCacheControl ? { _preserveCacheControl: true } : {}),
                   ...(preserveResponsesReasoning ? { _preserveReasoningContent: true } : {}),
-                  ...(isGlmFamilyUpstream ? { _ensureUserTurn: true } : {}),
+                  ...(isGlmFamilyUpstream ? { _ensureUserTurn: true, _stripImages: true } : {}),
                 }
               : credentials;
           result = toOpenAI(model, result, stream, step1Credentials);

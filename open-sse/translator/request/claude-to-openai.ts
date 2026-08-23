@@ -209,6 +209,42 @@ export function claudeToOpenAIRequest(model, body, stream, credentials: unknown 
     result.messages.push({ role: "user", content: "(continue)" });
   }
 
+  // GLM-family text-only gateways reject any image part with `400 [1210]`
+  // ("Invalid API parameter" / 图片输入格式/解析错误). When the caller flags a
+  // GLM-family upstream (_stripImages), replace every image part with a short
+  // text marker so agent loops that carry screenshots (Read tool, browser
+  // captures) keep running on text-only models. Messages whose parts all
+  // become text collapse to the plain-string form GLM prefers.
+  const stripImages =
+    credentials !== null &&
+    typeof credentials === "object" &&
+    !Array.isArray(credentials) &&
+    (credentials as JsonRecord)._stripImages === true;
+  if (stripImages) {
+    for (const message of result.messages) {
+      if (!message || !Array.isArray(message.content)) continue;
+      let replaced = false;
+      const nextParts: JsonRecord[] = [];
+      for (const part of message.content) {
+        const record = part as JsonRecord;
+        if (record && record.type === "image_url") {
+          nextParts.push({
+            type: "text",
+            text: "[image omitted: this model has no vision support]",
+          });
+          replaced = true;
+          continue;
+        }
+        nextParts.push(part);
+      }
+      if (replaced) {
+        message.content = nextParts.every((p) => p.type === "text")
+          ? nextParts.map((p) => String((p as JsonRecord).text ?? "")).join("\n")
+          : nextParts;
+      }
+    }
+  }
+
   const useNativeResponsesWebSearch = shouldUseNativeResponsesWebSearch(credentials);
 
   // Tools
